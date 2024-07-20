@@ -60,9 +60,10 @@ class BERT_RNGD_SUT(BERT_PyTorch_SUT):
         self.version = transformers.__version__
 
         self.dump_path = args.dump_path
-        if not self.dump_path.exists():
-            with open(self.dump_path, "w") as f:
-                json.dump([], f)
+        if self.dump_path is not None:
+            if not self.dump_path.exists():
+                with open(self.dump_path, "w") as f:
+                    json.dump([], f)
         self.dump = {}
 
         print("Loading PyTorch model...")

@@ -55,15 +55,16 @@ mkdir -p $LOG_PATH
 
 SECONDS=0
 python $work_dir/run.py --scenario=$SCENARIO \
-              --backend=$BACKEND \
-              --mlperf_conf=$MLPERF_CONF \
-              --gpu \
-              --quantize \
-              --quant_param_path=$QUANT_PARAM_PATH \
-              --quant_format_path=$QUANT_FORMAT_PATH \
-              --max_examples=$N_COUNT \
-              --accuracy \
-              --dump_path=$DUMP_PATH
+          --backend=$BACKEND \
+          --mlperf_conf=$MLPERF_CONF \
+          --gpu \
+          --quantize \
+          --quant_param_path=$QUANT_PARAM_PATH \
+          --quant_format_path=$QUANT_FORMAT_PATH \
+          --max_examples=$N_COUNT \
+          --accuracy \
+          $(if [ "$DO_DUMP" = "true" ]; then echo "--dump_path=$DUMP_PATH"; fi)
+          
 duration=$SECONDS
 printf "$((duration / 60)) minutes and $((duration % 60)) seconds elapsed." &> $LOG_PATH/elapsed_time.log
 
