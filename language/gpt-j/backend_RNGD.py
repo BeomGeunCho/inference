@@ -320,7 +320,7 @@ class SUT_base(PyTorch_SUT_base):
             )
             input_masks_tensor = input_masks_tensor_dict["attention_mask"]
 
-            output_batch = self.generator.generate(
+            logits, next_token_scores = self.generator.generate(
                 input_ids=input_ids_tensor.to(self.device),
                 attention_mask=input_masks_tensor.to(self.device),
                 beam_scorer=beam_scorer,
@@ -333,46 +333,14 @@ class SUT_base(PyTorch_SUT_base):
                 kv_dtype=self.kv_dtype,
                 bucket_size=BUCKET_SIZE,
             )
-
-            input_batch_lengths = [x.shape[0] for x in input_batch["input_ids"]]
-
-            output_batch_lengths = [x.shape[0] for x in output_batch]
-
-            output_batch_truncated = []
-            for data, source_len in zip(output_batch, input_batch_lengths):
-                output_batch_truncated.append(data[source_len:])
-
-            output_batch_truncated = torch.stack(output_batch_truncated)
-
-            # Loadgen monitors the reponse in corresponding functions
-            if (
-                self.scenario == "SingleStream" or self.scenario == "Server"
-            ) and self.network == None:
-                return output_batch_truncated
-
-            pred_output_batch = output_batch_truncated.cpu().numpy()
-
-            decoded_outputs = [
-                self.tokenizer.decode(output, skip_special_tokens=True)
-                for output in pred_output_batch
-            ]
-            response_text = decoded_outputs[0]
+            import pdb;pdb.set_trace()
+            
             if self.dump_path:
                 self.dump.update({"output": {
-                    "pred_output_batch": pred_output_batch.tolist(),
-                    "response_text": response_text,
+                    #"logits": logits.cpu().numpy(),
+                    "next_token_scores": next_token_scores.cpu().numpy(),
                 }})
-            # Loadgen monitors the response in GPT_QDL
-            if self.network == "sut":
-                return {
-                    "pred_output_batch": pred_output_batch.tolist(),
-                    "response_text": response_text,
-                }
-
-            response_array = array.array("B", pred_output_batch[0].tobytes())
-            bi = response_array.buffer_info()
-            response = lg.QuerySampleResponse(query_id, bi[0], bi[1])
-            lg.QuerySamplesComplete([response])
+                
 
 
 class SUT_Offline(SUT_base):

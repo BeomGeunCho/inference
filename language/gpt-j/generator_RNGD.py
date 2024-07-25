@@ -260,6 +260,8 @@ class MLPerfSubmissionBeamSearch:
                 next_token_scores = torch.nn.functional.log_softmax(
                     next_token_logits, dim=-1
                 )  # [batch_size * num_beams, vocab_size]
+
+                return logits, next_token_scores
             else:
                 # For decode, we will use the logits as scores as model outputs
                 # torch.nn.functional.log_softmax(lm_logits[:, -1], dim=-1)
