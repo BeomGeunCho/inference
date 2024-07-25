@@ -2,7 +2,7 @@ import argparse
 import array
 import os
 from typing import Dict, List, Tuple
-
+import json
 import mlperf_loadgen as lg
 import torch
 from accelerate import disk_offload
@@ -132,7 +132,14 @@ class SUT_base(PyTorch_SUT_base):
         self.dataset_path = dataset_path
         self.max_examples = max_examples
         self.scenario = scenario
+        self.device = args.device
         self.qsl = qsl
+        self.dump_path = args.dump_path
+        if not self.dump_path.exists():
+            with open(self.dump_path, "w") as f:
+                json.dump([], f)
+        self.dump = {}
+
         print("Loading PyTorch model...")
 
         # dtype
@@ -147,18 +154,21 @@ class SUT_base(PyTorch_SUT_base):
             self.amp_enabled = False
             self.amp_dtype = torch.float32
         try:
-            self.model = GPTJForCausalLM.from_pretrained(
-                self.model_path,
-                device_map="auto" if not self.use_gpu else None,
-                low_cpu_mem_usage=True if not self.use_gpu else False,
-                torch_dtype=self.amp_dtype,
-                offload_folder=(
-                    "offload" if not self.use_gpu else None
-                ),  # specify offload folder when using devices with less RAM
-                offload_state_dict=(
-                    True if not self.use_gpu else False
-                ),  # to have some shards of the model to be on the disk
-            )
+            if self.device is not None:
+                self.model = GPTJForCausalLM.from_pretrained(self.model_path).to(self.device)
+            else:
+                self.model = GPTJForCausalLM.from_pretrained(
+                    self.model_path,
+                    device_map="auto" if not self.use_gpu else None,
+                    low_cpu_mem_usage=True if not self.use_gpu else False,
+                    torch_dtype=self.amp_dtype,
+                    offload_folder=(
+                        "offload" if not self.use_gpu else None
+                    ),  # specify offload folder when using devices with less RAM
+                    offload_state_dict=(
+                        True if not self.use_gpu else False
+                    ),  # to have some shards of the model to be on the disk
+                )
         except ValueError as e:
             if "disk_offload" in str(e):
                 print("Offloading the whole model to disk...")
@@ -190,10 +200,10 @@ class SUT_base(PyTorch_SUT_base):
             random_seed()
             set_optimization(args.torch_numeric_optim)
 
-            if not args.gpu:
-                raise ValueError(
-                    "Inference on a device other than GPU is not supported yet."
-                )
+            # if not args.gpu:
+            #     raise ValueError(
+            #         "Inference on a device other than GPU is not supported yet."
+            #     )
             traced_model = self.model.trace_all()
             model= quantize_model(traced_model, qparam_path=args.quant_param_path, qformat_path=args.quant_format_path)
             self.kv_dtype = QUANT_KV_DTYPE
@@ -228,6 +238,41 @@ class SUT_base(PyTorch_SUT_base):
         # construct SUT
         self.sut = lg.ConstructSUT(self.issue_queries, self.flush_queries)
 
+    def issue_queries(self, query_samples):
+        print("Number of Samples in query_samples : ", len(query_samples))
+
+        total_samples_done = 0
+        list_prompts_tokens = []
+        list_prompts_attn_masks = []
+
+        # Pass each query to inference_call function
+        # Activates only when scenario is Offline and network mode is None
+        for i in tqdm(range(len(query_samples))):
+            index = query_samples[i].index
+            input_ids_tensor = self.qsl.data_object.source_encoded_input_ids[index]
+            input_masks_tensor = self.qsl.data_object.source_encoded_attn_masks[index]
+            text = self.qsl.data_object.sources[index]
+            query = {
+                "input_text": text,
+                "input_ids_tensor": input_ids_tensor.tolist(),
+                "input_masks_tensor": input_masks_tensor.tolist()
+            }
+            
+            if self.dump_path:
+                self.dump.update({"qsl_idx": index})
+                self.dump.update({"input": query})
+                
+            self.inference_call(query, query_samples[i].id)
+            
+            if self.dump_path:
+                with open(self.dump_path, "r") as f:
+                    data = json.load(f)
+                
+                data.append(self.dump)
+                
+                with open(self.dump_path, "w") as f:
+                    json.dump(data, f)
+
     def inference_call(self, query, query_id=None):
         """Common for all scenarios"""
         torch_device_type = "cuda" if self.use_gpu else "cpu"
@@ -247,7 +292,7 @@ class SUT_base(PyTorch_SUT_base):
             input_batch = dict()
             input_batch["input_ids"] = input_ids_tensor
             input_batch["attention_mask"] = input_masks_tensor
-
+            
             logits_processor = LOGITS_PROCESSOR(
                 input_ids_tensor.shape[-1], MIN_NEW_TOKENS, EOS_TOKEN_ID
             )
@@ -275,8 +320,8 @@ class SUT_base(PyTorch_SUT_base):
             input_masks_tensor = input_masks_tensor_dict["attention_mask"]
 
             output_batch = self.generator.generate(
-                input_ids=input_ids_tensor,
-                attention_mask=input_masks_tensor,
+                input_ids=input_ids_tensor.to(self.device),
+                attention_mask=input_masks_tensor.to(self.device),
                 beam_scorer=beam_scorer,
                 logits_processor=logits_processor,
                 stopping_criteria=stopping_criteria,
@@ -311,7 +356,11 @@ class SUT_base(PyTorch_SUT_base):
                 for output in pred_output_batch
             ]
             response_text = decoded_outputs[0]
-
+            if self.dump_path:
+                self.dump.update({"output": {
+                    "pred_output_batch": pred_output_batch.tolist(),
+                    "response_text": response_text,
+                }})
             # Loadgen monitors the response in GPT_QDL
             if self.network == "sut":
                 return {

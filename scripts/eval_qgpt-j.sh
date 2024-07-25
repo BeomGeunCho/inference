@@ -25,7 +25,7 @@ BACKEND="rngd"
 MODEL_PATH=$data_dir/models/gpt-j
 DATASET_PATH=$data_dir/dataset/cnn-daily-mail/validation/cnn_eval.json
 LOG_PATH=$log_dir/$model_name/$SCENARIO/$(date +%Y%m%d_%H%M%S%Z)
-N_COUNT=${N_COUNT:="13368"} # total_len=13,368
+N_COUNT=${N_COUNT:="1"} # total_len=13,368
 
 # quantization args
 CALIBRATE=${CALIBRATE:=false}
@@ -41,6 +41,10 @@ printf "\tNUM_EVAL_DATA: $N_COUNT\n"
 printf "\tCALIBRATE: $CALIBRATE\n"
 
 export LOG_PATH
+
+if [ "$DO_DUMP" = true ]; then
+    DUMP_PATH="$LOG_PATH/encoder_dump_n$N_COUNT.json"
+fi
 
 mkdir -p $LOG_PATH/calibration_range
 
@@ -64,7 +68,7 @@ fi
 
 
 SECONDS=0
-python -m main --scenario=$SCENARIO \
+python $work_dir/main.py --scenario=$SCENARIO \
                 --backend=$BACKEND \
                --model-path=$MODEL_PATH \
                --dataset-path=$DATASET_PATH \
@@ -73,7 +77,9 @@ python -m main --scenario=$SCENARIO \
                --quant_param_path=$QUANT_PARAM_PATH \
                --quant_format_path=$QUANT_FORMAT_PATH \
                --max_examples=$N_COUNT \
-               --accuracy
+               --accuracy \
+               --dump_path=$DUMP_PATH
+
 duration=$SECONDS
 printf "$((duration / 60)) minutes and $((duration % 60)) seconds elapsed." &> $LOG_PATH/elapsed_time.log
 
