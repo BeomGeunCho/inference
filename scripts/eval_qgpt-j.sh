@@ -12,8 +12,7 @@ env_name=mlperf-$model_name
 conda_base=$($CONDA_EXE info --base)
 
 # work on model directory
-cd $work_dir
-
+DO_DUMP=true
 # enter existing conda env.
 source "$conda_base/etc/profile.d/conda.sh"
 conda activate $env_name
