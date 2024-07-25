@@ -24,7 +24,7 @@ BACKEND="rngd"
 MODEL_PATH=$data_dir/models/gpt-j
 DATASET_PATH=$data_dir/dataset/cnn-daily-mail/validation/cnn_eval.json
 LOG_PATH=$log_dir/$model_name/$SCENARIO/$(date +%Y%m%d_%H%M%S%Z)
-N_COUNT=${N_COUNT:="1"} # total_len=13,368
+N_COUNT=${N_COUNT:="100"} # total_len=13,368
 
 # quantization args
 CALIBRATE=${CALIBRATE:=false}

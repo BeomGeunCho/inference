@@ -253,7 +253,7 @@ class SUT_base(PyTorch_SUT_base):
             input_masks_tensor = self.qsl.data_object.source_encoded_attn_masks[index]
             text = self.qsl.data_object.sources[index]
             query = {
-                "input_ids_length": len(input_ids_tensor.tolist()),
+                "input_ids_length": len(input_ids_tensor.tolist()[0]),
                 "input_text": text,
                 "input_ids_tensor": input_ids_tensor.tolist(),
                 "input_masks_tensor": input_masks_tensor.tolist()
