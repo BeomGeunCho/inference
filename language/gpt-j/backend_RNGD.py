@@ -40,7 +40,7 @@ RETURN_DICT_IN_GENERATE = False
 LOGITS_PROCESSOR = MinNewTokensLengthLogitsProcessor
 STOPPING_CRITERIA = MaxLengthCriteria
 KV_DTYPE = torch.float32
-QUANT_KV_DTYPE = torch.int8
+QUANT_KV_DTYPE = torch.float32
 BUCKET_SIZE = 2048
 NUM_REAL_BATCH = 1
 
