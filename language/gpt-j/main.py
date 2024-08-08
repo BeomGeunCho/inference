@@ -128,7 +128,7 @@ def main():
             qsl=qsl # If args.network is None, then only QSL get passed to the SUT, else it will be None
         )
         elif args.backend == "rngd":
-            from backend_RNGD import get_SUT
+            from backend_RNGD_golden import get_SUT
 
             sut = get_SUT(
             model_path=args.model_path,
